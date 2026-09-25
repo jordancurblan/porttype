@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shelltype | command speed test</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌨️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --chassis:#1b2530;
+  --panel:#243140;
+  --edge:#35485c;
+  --ink:#e8eef4;
+  --muted:#8fa1b5;
+  --link:#f2b134;
+  --ok:#4cd97b;
+  --bad:#ff6161;
+  --term:#0e151c;
+  --display:"Barlow Condensed", "Arial Narrow", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--chassis);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.5;min-height:100vh}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto;padding:20px 24px}
+.brand{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.5px}
+.brand small{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--muted);margin-left:10px}
+.brand a{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--muted);margin-left:14px}
+.brand a:hover{color:var(--link)}
+.controls{display:flex;flex-wrap:wrap;gap:10px}
+.seg{display:flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 12px;cursor:pointer;color:var(--muted);font-size:13px}
+.seg button+button{border-left:1px solid var(--edge)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--link)}
+
+main{max-width:1100px;margin:0 auto;padding:8px 24px 48px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+
+.hud{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:13px}
+#timer{font-family:var(--display);font-size:44px;font-weight:700;color:var(--link);line-height:1}
+
+.task{
+  margin-top:18px;background:#f4f1e4;color:#1b2530;border-radius:4px;
+  padding:22px 22px 20px;text-align:center;
+  font-family:var(--display);font-weight:700;font-size:clamp(28px,4.4vw,44px);line-height:1.15;
+  min-height:124px;display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.12);
+}
+.task.flash-ok{box-shadow:inset 0 -6px 0 var(--ok)}
+.task.flash-bad{box-shadow:inset 0 -6px 0 var(--bad)}
+
+/* terminal: the signature element */
+.term{margin-top:18px;background:var(--term);border:1px solid var(--edge);border-radius:6px;overflow:hidden}
+.term-bar{display:flex;justify-content:space-between;padding:6px 12px;background:#18222c;color:var(--muted);font-size:12px;border-bottom:1px solid var(--edge)}
+.scroll{padding:10px 14px 0;min-height:168px;max-height:168px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;font-size:14px}
+.line{white-space:pre-wrap;word-break:break-word}
+.line .ps1{color:var(--muted)}
+.line.ok .cmd{color:var(--ok)}
+.line.bad .cmd{color:var(--bad);text-decoration:line-through}
+.line.fix{color:var(--link);padding-left:2ch}
+.inputrow{display:flex;align-items:center;gap:1ch;padding:8px 14px 12px;font-size:17px}
+.inputrow .ps1{color:var(--muted);white-space:nowrap}
+#answer{flex:1;min-width:0;background:transparent;border:0;outline:none;caret-color:var(--link);font-size:17px;padding:4px 0}
+.help{color:var(--muted);font-size:12px;text-align:center;margin-top:14px}
+kbd{border:1px solid var(--edge);border-radius:3px;padding:0 5px;font-size:11px}
+
+#results h2,.board h2{font-family:var(--display);font-weight:700;font-size:28px;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel);border-radius:6px;padding:12px}
+.stat b{display:block;font-family:var(--display);font-size:34px;line-height:1.1;color:var(--link)}
+.stat span{color:var(--muted);font-size:12px}
+.missed{background:var(--panel);border-radius:6px;padding:12px 16px;margin-bottom:20px}
+.missed h3{margin:0 0 6px;font-size:14px;font-weight:600}
+.missed ul{margin:0;padding-left:18px;color:var(--muted)}
+.missed li strong{color:var(--ink)}
+.missed code{color:var(--link)}
+form.post{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+@media (max-width:520px){form.post{grid-template-columns:1fr}}
+form.post label{font-size:12px;color:var(--muted)}
+form.post input{display:block;width:100%;margin-top:4px;background:var(--panel);border:1px solid var(--edge);border-radius:6px;padding:9px 10px}
+.btn{background:var(--link);color:#1b2530;border:0;border-radius:6px;padding:10px 16px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--edge)}
+.row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.msg{font-size:13px;margin-top:10px;min-height:20px}
+
+.board{border-left:1px solid var(--edge);padding-left:28px}
+@media (max-width:860px){.board{border-left:0;padding-left:0;border-top:1px solid var(--edge);padding-top:24px}}
+.board .sub{color:var(--muted);font-size:13px;margin:-8px 0 14px}
+.board ol{list-style:none;margin:0;padding:0}
+.board li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:baseline;padding:8px 0;border-bottom:1px solid #2b3a4a}
+.board .rank{color:var(--muted)}
+.board li:first-child .rank{color:var(--link)}
+.board .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .pts{font-weight:600}
+.board .acc{grid-column:2/4;color:var(--muted);font-size:12px;margin-top:-6px}
+.board .empty{color:var(--muted);font-size:13px}
+.board .note{color:var(--muted);font-size:12px;margin-top:14px}
+
+[hidden]{display:none !important}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">shelltype <small>command speed test</small><a href="./">porttype</a></div>
+  <div class="controls">
+    <div class="seg" id="modeSeg" role="group" aria-label="Shell">
+      <button data-mode="cmd" aria-pressed="true">CMD</button>
+      <button data-mode="ps" aria-pressed="false">PowerShell</button>
+      <button data-mode="linux" aria-pressed="false">Linux</button>
+    </div>
+    <div class="seg" id="durSeg" role="group" aria-label="Duration">
+      <button data-dur="30" aria-pressed="false">30s</button>
+      <button data-dur="60" aria-pressed="true">60s</button>
+      <button data-dur="120" aria-pressed="false">120s</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div>
+    <section id="game">
+      <div class="hud">
+        <span id="timer">60</span>
+        <span id="live">Start typing to begin</span>
+      </div>
+      <div class="task" id="task">Show your IP configuration</div>
+      <div class="term">
+        <div class="term-bar"><span id="termTitle">Command Prompt</span><span id="termCount">0 ran / 0 failed</span></div>
+        <div class="scroll" id="scroll" aria-live="polite"></div>
+        <div class="inputrow">
+          <span class="ps1" id="ps1">C:\&gt;</span>
+          <input id="answer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Your command">
+        </div>
+      </div>
+      <p class="help"><kbd>Enter</kbd> runs the command. <kbd>Esc</kbd> restarts.</p>
+    </section>
+
+    <section id="results" hidden>
+      <h2>Run complete</h2>
+      <div class="stats">
+        <div class="stat"><b id="rCorrect">0</b><span>correct</span></div>
+        <div class="stat"><b id="rAcc">0%</b><span>accuracy</span></div>
+        <div class="stat"><b id="rRate">0</b><span>per minute</span></div>
+        <div class="stat"><b id="rStreak">0</b><span>best streak</span></div>
+      </div>
+      <div class="missed" id="missedBox" hidden>
+        <h3>Study these</h3>
+        <ul id="missedList"></ul>
+      </div>
+      <form class="post" id="postForm">
+        <label>Name<input id="pName" maxlength="20" required></label>
+        <label id="codeWrap">Team code<input id="pCode" type="password" maxlength="40"></label>
+        <button class="btn" type="submit" id="postBtn">Post score</button>
+      </form>
+      <div class="msg" id="postMsg" aria-live="polite"></div>
+      <div class="row"><button class="btn ghost" id="againBtn">Run it again</button></div>
+    </section>
+  </div>
+
+  <aside class="board">
+    <h2>Leaderboard</h2>
+    <p class="sub" id="boardSub"></p>
+    <ol id="boardList"></ol>
+    <p class="note" id="boardNote"></p>
+  </aside>
+</main>
+
+<script>
+/* =========================================================
+   CONFIG: same Apps Script URL as porttype (one sheet holds both games)
+   ========================================================= */
+const LEADERBOARD_URL = "";
+
+/* ---------- command sets ----------
+   t = task shown, a = accepted answers (first one is shown when you miss) */
+const SETS = {
+  cmd: {
+    title:"Command Prompt", ps1:"C:\\>",
+    items:[
+      {t:"Show your IP configuration", a:["ipconfig"]},
+      {t:"Show full IP config, including MAC and DNS servers", a:["ipconfig /all"]},
+      {t:"Release the DHCP lease", a:["ipconfig /release"]},
+      {t:"Renew the DHCP lease", a:["ipconfig /renew"]},
+      {t:"Clear the DNS resolver cache", a:["ipconfig /flushdns"]},
+      {t:"Show the DNS resolver cache", a:["ipconfig /displaydns"]},
+      {t:"Test connectivity to 8.8.8.8", a:["ping 8.8.8.8"]},
+      {t:"Ping google.com nonstop until you stop it", a:["ping -t google.com","ping google.com -t","ping /t google.com","ping google.com /t"]},
+      {t:"Trace the route to 8.8.8.8", a:["tracert 8.8.8.8"]},
+      {t:"Trace the route to 8.8.8.8 with per-hop packet loss", a:["pathping 8.8.8.8"]},
+      {t:"Look up DNS records for google.com", a:["nslookup google.com"]},
+      {t:"Show all connections and listening ports, numeric", a:["netstat -an","netstat -na"]},
+      {t:"Show connections with the owning process ID", a:["netstat -ano","netstat -aon","netstat -o"]},
+      {t:"Show the ARP cache", a:["arp -a"]},
+      {t:"Show the routing table", a:["route print","netstat -r"]},
+      {t:"Show this computer's MAC addresses", a:["getmac"]},
+      {t:"Show this computer's name", a:["hostname"]},
+      {t:"Show who you're logged in as", a:["whoami"]},
+      {t:"Show OS version, RAM, and installed patches", a:["systeminfo"]},
+      {t:"Scan and repair protected system files", a:["sfc /scannow"]},
+      {t:"Check drive C: and fix errors", a:["chkdsk C: /f","chkdsk /f C:","chkdsk c: /f"]},
+      {t:"Force a Group Policy refresh", a:["gpupdate /force"]},
+      {t:"Show which Group Policies applied", a:["gpresult /r"]},
+      {t:"List running processes", a:["tasklist"]},
+      {t:"Kill notepad.exe", a:["taskkill /im notepad.exe","taskkill /f /im notepad.exe","taskkill /im notepad.exe /f"]},
+      {t:"Restart the computer right now", a:["shutdown /r /t 0","shutdown -r -t 0"]},
+      {t:"Shut down the computer right now", a:["shutdown /s /t 0","shutdown -s -t 0"]},
+      {t:"List saved Wi-Fi profiles", a:["netsh wlan show profiles","netsh wlan show profile"]},
+      {t:"Map drive Z: to \\\\server\\share", a:["net use Z: \\\\server\\share","net use z: \\\\server\\share"]},
+      {t:"List local user accounts", a:["net user"]},
+      {t:"Check the status of the Spooler service", a:["sc query spooler"]},
+      {t:"Open the disk partitioning tool", a:["diskpart"]},
+      {t:"Show the Windows version in the terminal", a:["ver"]},
+      {t:"List files in this folder", a:["dir"]},
+      {t:"Go up one folder", a:["cd ..","cd.."]},
+      {t:"Make a folder called logs", a:["mkdir logs","md logs"]},
+      {t:"Clear the screen", a:["cls"]},
+    ]
+  },
+  ps: {
+    title:"Windows PowerShell", ps1:"PS C:\\>",
+    items:[
+      {t:"Show IP configuration for all adapters", a:["Get-NetIPConfiguration","gip","ipconfig"]},
+      {t:"List IP addresses on this machine", a:["Get-NetIPAddress"]},
+      {t:"List network adapters", a:["Get-NetAdapter"]},
+      {t:"Ping 8.8.8.8", a:["Test-Connection 8.8.8.8","Test-NetConnection 8.8.8.8","tnc 8.8.8.8"]},
+      {t:"Check if port 443 is open on google.com", a:["Test-NetConnection google.com -Port 443","tnc google.com -Port 443","Test-NetConnection -ComputerName google.com -Port 443"]},
+      {t:"Resolve DNS for google.com", a:["Resolve-DnsName google.com"]},
+      {t:"Clear the DNS client cache", a:["Clear-DnsClientCache"]},
+      {t:"Show the DNS client cache", a:["Get-DnsClientCache"]},
+      {t:"Show the routing table", a:["Get-NetRoute"]},
+      {t:"Show TCP connections", a:["Get-NetTCPConnection"]},
+      {t:"Show the ARP / neighbor cache", a:["Get-NetNeighbor"]},
+      {t:"Show firewall profiles", a:["Get-NetFirewallProfile"]},
+      {t:"List running processes", a:["Get-Process","gps","ps"]},
+      {t:"Stop the notepad process", a:["Stop-Process -Name notepad","spps -Name notepad","Stop-Process -Name notepad -Force","kill -Name notepad"]},
+      {t:"List services", a:["Get-Service","gsv"]},
+      {t:"Restart the Spooler service", a:["Restart-Service Spooler","Restart-Service -Name Spooler"]},
+      {t:"Start the Spooler service", a:["Start-Service Spooler","Start-Service -Name Spooler"]},
+      {t:"Stop the Spooler service", a:["Stop-Service Spooler","Stop-Service -Name Spooler"]},
+      {t:"Show detailed computer info", a:["Get-ComputerInfo"]},
+      {t:"Show installed Windows updates (hotfixes)", a:["Get-HotFix"]},
+      {t:"List local user accounts", a:["Get-LocalUser"]},
+      {t:"Restart the computer", a:["Restart-Computer"]},
+      {t:"Show help for Get-Process", a:["Get-Help Get-Process","help Get-Process"]},
+      {t:"Find every command with Net in its name", a:["Get-Command *Net*","gcm *Net*"]},
+      {t:"Show the script execution policy", a:["Get-ExecutionPolicy"]},
+      {t:"Allow local scripts to run (RemoteSigned)", a:["Set-ExecutionPolicy RemoteSigned","Set-ExecutionPolicy -ExecutionPolicy RemoteSigned"]},
+      {t:"List files in this folder", a:["Get-ChildItem","gci","dir","ls"]},
+      {t:"Show the contents of log.txt", a:["Get-Content log.txt","gc log.txt","cat log.txt","type log.txt"]},
+      {t:"Show the PowerShell version", a:["$PSVersionTable","$PSVersionTable.PSVersion"]},
+      {t:"Show this computer's name", a:["$env:COMPUTERNAME","hostname"]},
+      {t:"Show your command history", a:["Get-History","history","h"]},
+      {t:"Clear the screen", a:["Clear-Host","cls","clear"]},
+    ]
+  },
+  linux: {
+    title:"bash", ps1:"jordan@lab:~$",
+    items:[
+      {t:"Show IP addresses", a:["ip a","ip addr","ip address","ip addr show","ifconfig"]},
+      {t:"Show the routing table", a:["ip route","ip r","route -n","netstat -r"]},
+      {t:"Show the ARP / neighbor table", a:["ip neigh","ip n","arp -a"]},
+      {t:"Show listening TCP and UDP ports, numeric", a:["ss -tuln","netstat -tuln"]},
+      {t:"Ping 8.8.8.8 exactly 4 times", a:["ping -c 4 8.8.8.8","ping 8.8.8.8 -c 4"]},
+      {t:"Trace the route to 8.8.8.8", a:["traceroute 8.8.8.8","tracepath 8.8.8.8"]},
+      {t:"Look up DNS records for google.com", a:["dig google.com","nslookup google.com","host google.com"]},
+      {t:"Show this machine's hostname", a:["hostname"]},
+      {t:"Show who you're logged in as", a:["whoami"]},
+      {t:"Show the current directory", a:["pwd"]},
+      {t:"List all files, hidden ones too, long format", a:["ls -la","ls -al","ls -l -a","ls -a -l"]},
+      {t:"Go to your home directory", a:["cd ~","cd"]},
+      {t:"Make a directory called logs", a:["mkdir logs"]},
+      {t:"Delete the folder old and everything in it", a:["rm -r old","rm -rf old"]},
+      {t:"Copy a.txt to b.txt", a:["cp a.txt b.txt"]},
+      {t:"Rename a.txt to b.txt", a:["mv a.txt b.txt"]},
+      {t:"Print the contents of file.txt", a:["cat file.txt"]},
+      {t:"Watch /var/log/syslog live as it updates", a:["tail -f /var/log/syslog"]},
+      {t:"Search log.txt for the word error", a:["grep error log.txt"]},
+      {t:"Make script.sh executable", a:["chmod +x script.sh"]},
+      {t:"Make jordan the owner of file.txt", a:["sudo chown jordan file.txt"]},
+      {t:"Refresh package lists (Debian/Ubuntu)", a:["sudo apt update"]},
+      {t:"Install nmap (Debian/Ubuntu)", a:["sudo apt install nmap"]},
+      {t:"List every running process", a:["ps aux","ps -ef"]},
+      {t:"Open the live process monitor", a:["top","htop"]},
+      {t:"Kill process 1234", a:["kill 1234","kill -9 1234"]},
+      {t:"Show disk space, human readable", a:["df -h"]},
+      {t:"Show memory usage, human readable", a:["free -h"]},
+      {t:"Check the status of the ssh service", a:["systemctl status ssh","systemctl status sshd"]},
+      {t:"Restart the ssh service", a:["sudo systemctl restart ssh","sudo systemctl restart sshd"]},
+      {t:"SSH into 10.0.0.5 as admin", a:["ssh admin@10.0.0.5"]},
+      {t:"Scan 10.0.0.5 with nmap", a:["nmap 10.0.0.5"]},
+      {t:"Capture packets on eth0", a:["sudo tcpdump -i eth0"]},
+      {t:"Show kernel and system info", a:["uname -a"]},
+      {t:"Open the manual for ls", a:["man ls"]},
+      {t:"Clear the screen", a:["clear"]},
+    ]
+  }
+};
+
+/* Windows shells ignore case; Linux doesn't. sudo is optional, quotes are ignored,
+   and combined Linux flags match in any order (-tuln = -tlnu). */
+function normalize(s, m){
+  s = s.trim().replace(/["']/g, "").replace(/\s+/g, " ");
+  if (m !== "linux") return s.toLowerCase();
+  s = s.replace(/^sudo /, "");
+  return s.split(" ").map(t => /^-[a-zA-Z]{2,}$/.test(t) ? "-" + [...t.slice(1)].sort().join("") : t).join(" ");
+}
+
+/* ---------- storage helpers ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+
+/* ---------- state ---------- */
+let mode = store.get("st_mode", "cmd");
+let duration = store.get("st_dur", 60);
+let state = "idle";
+let q = null, lastIdx = -1, startAt = 0, tick = null;
+let correct = 0, attempts = 0, streak = 0, bestStreak = 0;
+let missed = new Map();
+
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function nextTask(){
+  const items = SETS[mode].items;
+  let i;
+  do { i = Math.floor(Math.random()*items.length); } while (i === lastIdx && items.length > 1);
+  lastIdx = i;
+  q = items[i];
+  $("task").textContent = q.t;
+}
+
+function addLine(html, cls){
+  const el = document.createElement("div");
+  el.className = "line " + (cls || "");
+  el.innerHTML = html;
+  $("scroll").appendChild(el);
+  while ($("scroll").children.length > 12) $("scroll").firstChild.remove();
+}
+
+function reset(){
+  clearInterval(tick);
+  state = "idle";
+  correct = attempts = streak = bestStreak = 0;
+  missed = new Map();
+  const set = SETS[mode];
+  $("termTitle").textContent = set.title;
+  $("ps1").textContent = set.ps1;
+  $("scroll").innerHTML = "";
+  $("termCount").textContent = "0 ran / 0 failed";
+  $("timer").textContent = duration;
+  $("live").textContent = "Start typing to begin";
+  $("answer").value = "";
+  $("answer").disabled = false;
+  $("game").hidden = false;
+  $("results").hidden = true;
+  nextTask();
+  $("answer").focus();
+}
+function start(){
+  state = "running";
+  startAt = Date.now();
+  tick = setInterval(() => {
+    const left = Math.max(0, duration - (Date.now() - startAt)/1000);
+    $("timer").textContent = Math.ceil(left);
+    if (left <= 0) finish();
+  }, 100);
+}
+function submit(){
+  const raw = $("answer").value;
+  if (!raw.trim() || state === "done") return;
+  if (state === "idle") start();
+  attempts++;
+  const guess = normalize(raw, mode);
+  const ok = q.a.some(a => normalize(a, mode) === guess);
+  const ps1 = `<span class="ps1">${esc(SETS[mode].ps1)}</span> `;
+  const task = $("task");
+  task.classList.remove("flash-ok","flash-bad");
+  void task.offsetWidth;
+  if (ok){
+    correct++; streak++; bestStreak = Math.max(bestStreak, streak);
+    task.classList.add("flash-ok");
+    addLine(ps1 + `<span class="cmd">${esc(raw.trim())}</span>`, "ok");
+  } else {
+    streak = 0;
+    task.classList.add("flash-bad");
+    addLine(ps1 + `<span class="cmd">${esc(raw.trim())}</span>`, "bad");
+    addLine(`correct: ${esc(q.a[0])}`, "fix");
+    missed.set(q.t, `<strong>${esc(q.t)}</strong><br><code>${esc(q.a[0])}</code>`);
+  }
+  $("termCount").textContent = `${correct} ran / ${attempts - correct} failed`;
+  $("live").textContent = streak >= 5 ? `${correct} correct, ${streak} in a row` : `${correct} correct`;
+  $("answer").value = "";
+  nextTask();
+}
+function finish(){
+  clearInterval(tick);
+  state = "done";
+  $("answer").disabled = true;
+  const acc = attempts ? Math.round(correct/attempts*100) : 0;
+  $("rCorrect").textContent = correct;
+  $("rAcc").textContent = acc + "%";
+  $("rRate").textContent = Math.round(correct / (duration/60));
+  $("rStreak").textContent = bestStreak;
+  $("missedList").innerHTML = [...missed.values()].map(m => `<li>${m}</li>`).join("");
+  $("missedBox").hidden = missed.size === 0;
+  $("pName").value = store.get("pt_name", "");
+  $("pCode").value = store.get("pt_code", "");
+  $("codeWrap").hidden = !LEADERBOARD_URL;
+  $("postMsg").textContent = "";
+  $("postBtn").disabled = correct === 0;
+  $("game").hidden = true;
+  $("results").hidden = false;
+  $("pName").focus();
+}
+
+/* ---------- leaderboard (shared with porttype) ---------- */
+const MODE_NAMES = {cmd:"CMD", ps:"PowerShell", linux:"Linux"};
+function bestPerName(rows){
+  const best = {};
+  rows.forEach(r => {
+    const k = r.name.toLowerCase();
+    if (!best[k] || r.score > best[k].score || (r.score === best[k].score && r.accuracy > best[k].accuracy)) best[k] = r;
+  });
+  return Object.values(best).sort((a,b) => b.score - a.score || b.accuracy - a.accuracy).slice(0,10);
+}
+function renderBoard(rows){
+  const list = $("boardList");
+  if (!rows.length){ list.innerHTML = '<li class="empty">No scores yet. Set the first one.</li>'; return; }
+  list.innerHTML = rows.map((r,i) =>
+    `<li><span class="rank">${i+1}</span><span class="name">${esc(r.name)}</span><span class="pts">${r.score}</span><span class="acc">${r.accuracy}% accuracy</span></li>`
+  ).join("");
+}
+async function loadBoard(){
+  $("boardSub").textContent = `${MODE_NAMES[mode]}, ${duration}s`;
+  $("boardNote").textContent = LEADERBOARD_URL ? "Best score per person." : "Scores are saved in this browser only.";
+  if (!LEADERBOARD_URL){ renderBoard(bestPerName(store.get(`st_local_${mode}_${duration}`, []))); return; }
+  $("boardList").innerHTML = '<li class="empty">Loading scores…</li>';
+  try{
+    const res = await fetch(`${LEADERBOARD_URL}?mode=${mode}&duration=${duration}`);
+    const data = await res.json();
+    renderBoard(data.scores || []);
+  }catch{
+    $("boardList").innerHTML = '<li class="empty">Couldn’t reach the leaderboard. Check your connection and switch modes to retry.</li>';
+  }
+}
+async function postScore(e){
+  e.preventDefault();
+  const name = $("pName").value.trim().slice(0,20);
+  if (!name) return;
+  const accuracy = attempts ? Math.round(correct/attempts*100) : 0;
+  store.set("pt_name", name);
+  $("postBtn").disabled = true;
+  if (!LEADERBOARD_URL){
+    const key = `st_local_${mode}_${duration}`;
+    const rows = store.get(key, []);
+    rows.push({name, score:correct, accuracy});
+    store.set(key, rows);
+    $("postMsg").textContent = "Saved.";
+    loadBoard();
+    return;
+  }
+  const code = $("pCode").value.trim();
+  $("postMsg").textContent = "Posting…";
+  try{
+    const res = await fetch(LEADERBOARD_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({code, name, mode, duration, score:correct, accuracy})
+    });
+    const data = await res.json();
+    if (data.ok){ store.set("pt_code", code); $("postMsg").textContent = "Posted."; loadBoard(); }
+    else { $("postMsg").textContent = data.error || "The leaderboard rejected that score."; $("postBtn").disabled = false; }
+  }catch{
+    $("postMsg").textContent = "Couldn’t reach the leaderboard. Try again in a moment.";
+    $("postBtn").disabled = false;
+  }
+}
+
+/* ---------- controls ---------- */
+function syncSeg(){
+  document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  document.querySelectorAll("#durSeg button").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.dur) === duration));
+}
+$("modeSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  mode = b.dataset.mode; store.set("st_mode", mode); syncSeg(); reset(); loadBoard();
+});
+$("durSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  duration = Number(b.dataset.dur); store.set("st_dur", duration); syncSeg(); reset(); loadBoard();
+});
+$("answer").addEventListener("input", () => { if (state === "idle" && $("answer").value.trim()) start(); });
+$("answer").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); submit(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); reset(); } });
+document.addEventListener("click", e => { if (state !== "done" && e.target.closest(".term")) $("answer").focus(); });
+$("postForm").addEventListener("submit", postScore);
+$("againBtn").addEventListener("click", reset);
+
+syncSeg();
+reset();
+loadBoard();
+</script>
+</body>
+</html>
