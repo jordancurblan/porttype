@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>porttype | Net+ port speed test</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔌</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============ CONFIG NOTE ============
+   Leaderboard URL + settings live in the <script> at the bottom. */
+:root{
+  --chassis:#1b2530;
+  --panel:#243140;
+  --edge:#35485c;
+  --ink:#e8eef4;
+  --muted:#8fa1b5;
+  --link:#f2b134;
+  --ok:#4cd97b;
+  --bad:#ff6161;
+  --display:"Barlow Condensed", "Arial Narrow", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--chassis);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:15px;
+  line-height:1.5;
+  min-height:100vh;
+}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+
+header{
+  display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;
+  max-width:1100px;margin:0 auto;padding:20px 24px;
+}
+.brand{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.5px}
+.brand small{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--muted);margin-left:10px}
+.controls{display:flex;flex-wrap:wrap;gap:10px}
+.seg{display:flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden}
+.seg button{
+  background:transparent;border:0;padding:6px 12px;cursor:pointer;color:var(--muted);font-size:13px;
+}
+.seg button+button{border-left:1px solid var(--edge)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--link)}
+
+main{
+  max-width:1100px;margin:0 auto;padding:8px 24px 48px;
+  display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px;
+}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+
+/* ---- game ---- */
+.hud{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:13px}
+#timer{font-family:var(--display);font-size:44px;font-weight:700;color:var(--link);line-height:1}
+.label{
+  margin-top:18px;
+  background:#f4f1e4;color:#1b2530;
+  border-radius:4px;
+  padding:26px 20px 22px;
+  text-align:center;
+  font-family:var(--display);font-weight:700;
+  font-size:clamp(56px,11vw,112px);line-height:1;
+  box-shadow:inset 0 -4px 0 rgba(0,0,0,.12);
+}
+.label.flash-ok{box-shadow:inset 0 -6px 0 var(--ok)}
+.label.flash-bad{box-shadow:inset 0 -6px 0 var(--bad)}
+.hint{text-align:center;color:var(--muted);margin:10px 0 18px;font-size:14px}
+#answer{
+  display:block;width:100%;
+  background:var(--panel);border:1px solid var(--edge);border-radius:6px;
+  padding:14px 16px;font-size:22px;text-align:center;letter-spacing:1px;
+}
+#answer:focus{border-color:var(--link);outline:none}
+.feedback{min-height:26px;text-align:center;margin-top:10px;font-size:14px}
+.feedback.bad{color:var(--bad)}
+.feedback.ok{color:var(--ok)}
+
+/* switch panel: the signature element */
+.panel{
+  margin-top:22px;
+  background:#121a22;border:1px solid var(--edge);border-radius:6px;
+  padding:14px 16px 10px;
+}
+.ports{display:grid;grid-template-columns:repeat(12,1fr);gap:6px}
+.port{
+  aspect-ratio:1.25/1;background:#0a0f14;border:2px solid #3b4d61;border-radius:3px;
+  position:relative;
+}
+.port::after{
+  content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;
+  background:#2a3a4a;
+}
+.port.ok::after{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.port.bad::after{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.panel-foot{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:8px}
+.help{color:var(--muted);font-size:12px;text-align:center;margin-top:16px}
+kbd{border:1px solid var(--edge);border-radius:3px;padding:0 5px;font-size:11px}
+
+/* ---- results ---- */
+#results h2,.board h2{font-family:var(--display);font-weight:700;font-size:28px;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel);border-radius:6px;padding:12px}
+.stat b{display:block;font-family:var(--display);font-size:34px;line-height:1.1;color:var(--link)}
+.stat span{color:var(--muted);font-size:12px}
+.missed{background:var(--panel);border-radius:6px;padding:12px 16px;margin-bottom:20px}
+.missed h3{margin:0 0 6px;font-size:14px;font-weight:600}
+.missed ul{margin:0;padding-left:18px;color:var(--muted)}
+.missed li strong{color:var(--ink)}
+form.post{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+@media (max-width:520px){form.post{grid-template-columns:1fr}}
+form.post label{font-size:12px;color:var(--muted)}
+form.post input{
+  display:block;width:100%;margin-top:4px;background:var(--panel);border:1px solid var(--edge);
+  border-radius:6px;padding:9px 10px;
+}
+.btn{
+  background:var(--link);color:#1b2530;border:0;border-radius:6px;padding:10px 16px;
+  font-weight:600;cursor:pointer;
+}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--edge)}
+.row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.msg{font-size:13px;margin-top:10px;min-height:20px}
+
+/* ---- leaderboard ---- */
+.board{border-left:1px solid var(--edge);padding-left:28px}
+@media (max-width:860px){.board{border-left:0;padding-left:0;border-top:1px solid var(--edge);padding-top:24px}}
+.board .sub{color:var(--muted);font-size:13px;margin:-8px 0 14px}
+.board ol{list-style:none;margin:0;padding:0}
+.board li{
+  display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:baseline;
+  padding:8px 0;border-bottom:1px solid #2b3a4a;
+}
+.board .rank{color:var(--muted)}
+.board li:first-child .rank{color:var(--link)}
+.board .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .pts{font-weight:600}
+.board .acc{grid-column:2/4;color:var(--muted);font-size:12px;margin-top:-6px}
+.board .empty{color:var(--muted);font-size:13px}
+.board .note{color:var(--muted);font-size:12px;margin-top:14px}
+
+[hidden]{display:none !important}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">porttype <small>Net+ port speed test</small></div>
+  <div class="controls">
+    <div class="seg" id="modeSeg" role="group" aria-label="Mode">
+      <button data-mode="n2p" aria-pressed="true">Protocol to port</button>
+      <button data-mode="p2n" aria-pressed="false">Port to protocol</button>
+      <button data-mode="mix" aria-pressed="false">Mixed</button>
+    </div>
+    <div class="seg" id="durSeg" role="group" aria-label="Duration">
+      <button data-dur="30" aria-pressed="false">30s</button>
+      <button data-dur="60" aria-pressed="true">60s</button>
+      <button data-dur="120" aria-pressed="false">120s</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div>
+    <section id="game">
+      <div class="hud">
+        <span id="timer">60</span>
+        <span id="live">Start typing to begin</span>
+      </div>
+      <div class="label" id="prompt">SSH</div>
+      <div class="hint" id="hint">Type the port number</div>
+      <input id="answer" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Your answer">
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <div class="panel" aria-hidden="true">
+        <div class="ports" id="ports"></div>
+        <div class="panel-foot"><span>Gi0/1–24</span><span id="linkCount">0 up / 0 down</span></div>
+      </div>
+      <p class="help"><kbd>Enter</kbd> or <kbd>Space</kbd> submits. <kbd>Tab</kbd> or <kbd>Esc</kbd> restarts.</p>
+    </section>
+
+    <section id="results" hidden>
+      <h2>Run complete</h2>
+      <div class="stats">
+        <div class="stat"><b id="rCorrect">0</b><span>correct</span></div>
+        <div class="stat"><b id="rAcc">0%</b><span>accuracy</span></div>
+        <div class="stat"><b id="rRate">0</b><span>per minute</span></div>
+        <div class="stat"><b id="rStreak">0</b><span>best streak</span></div>
+      </div>
+      <div class="missed" id="missedBox" hidden>
+        <h3>Study these</h3>
+        <ul id="missedList"></ul>
+      </div>
+      <form class="post" id="postForm">
+        <label>Name<input id="pName" maxlength="20" required></label>
+        <label id="codeWrap">Team code<input id="pCode" type="password" maxlength="40"></label>
+        <button class="btn" type="submit" id="postBtn">Post score</button>
+      </form>
+      <div class="msg" id="postMsg" aria-live="polite"></div>
+      <div class="row">
+        <button class="btn ghost" id="againBtn">Run it again</button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="board">
+    <h2>Leaderboard</h2>
+    <p class="sub" id="boardSub"></p>
+    <ol id="boardList"></ol>
+    <p class="note" id="boardNote"></p>
+  </aside>
+</main>
+
+<script>
+/* =========================================================
+   CONFIG
+   Paste your Google Apps Script web app URL here to turn on
+   the shared department leaderboard. Leave it empty and scores
+   only save in this browser.
+   ========================================================= */
+const LEADERBOARD_URL = "";
+
+/* ---------- port data (Network+) ---------- */
+const PROTOS = [
+  {name:"FTP",        ports:[20,21],     alias:["ftp"]},
+  {name:"SSH",        ports:[22],        alias:["ssh"]},
+  {name:"SFTP",       ports:[22],        alias:["sftp","scp"]},
+  {name:"Telnet",     ports:[23],        alias:["telnet"]},
+  {name:"SMTP",       ports:[25],        alias:["smtp"]},
+  {name:"DNS",        ports:[53],        alias:["dns"]},
+  {name:"DHCP",       ports:[67,68],     alias:["dhcp","bootp"]},
+  {name:"TFTP",       ports:[69],        alias:["tftp"]},
+  {name:"HTTP",       ports:[80],        alias:["http"]},
+  {name:"Kerberos",   ports:[88],        alias:["kerberos"]},
+  {name:"POP3",       ports:[110],       alias:["pop3","pop"]},
+  {name:"NTP",        ports:[123],       alias:["ntp"]},
+  {name:"IMAP",       ports:[143],       alias:["imap","imap4"]},
+  {name:"SNMP",       ports:[161,162],   alias:["snmp"]},
+  {name:"LDAP",       ports:[389],       alias:["ldap"]},
+  {name:"HTTPS",      ports:[443],       alias:["https","tls","ssl"]},
+  {name:"SMB",        ports:[445],       alias:["smb","cifs"]},
+  {name:"Syslog",     ports:[514],       alias:["syslog"]},
+  {name:"SMTPS",      ports:[587,465],   alias:["smtps"]},
+  {name:"LDAPS",      ports:[636],       alias:["ldaps"]},
+  {name:"IMAPS",      ports:[993],       alias:["imaps"]},
+  {name:"POP3S",      ports:[995],       alias:["pop3s","pops"]},
+  {name:"SQL Server", ports:[1433],      alias:["sqlserver","mssql","sql"]},
+  {name:"RDP",        ports:[3389],      alias:["rdp"]},
+  {name:"SIP",        ports:[5060,5061], alias:["sip"]},
+];
+// port -> protocols that use it (for port-to-protocol prompts)
+const PORT_MAP = {};
+PROTOS.forEach(p => p.ports.forEach(n => (PORT_MAP[n] ||= []).push(p)));
+// don't ask for 465 as a port prompt, it's the "also accepted" SMTPS port
+const PORT_PROMPTS = Object.keys(PORT_MAP).map(Number).filter(n => n !== 465);
+
+/* ---------- storage helpers (safe if blocked) ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+
+/* ---------- state ---------- */
+let mode = store.get("pt_mode", "n2p");
+let duration = store.get("pt_dur", 60);
+let state = "idle";           // idle | running | done
+let q = null, lastKey = "";
+let startAt = 0, tick = null;
+let correct = 0, attempts = 0, streak = 0, bestStreak = 0;
+let missed = new Map();
+
+const $ = id => document.getElementById(id);
+const norm = s => s.toLowerCase().replace(/[\s\-_.]/g, "");
+
+/* ---------- questions ---------- */
+function makeQuestion(){
+  const type = mode === "mix" ? (Math.random() < .5 ? "n2p" : "p2n") : mode;
+  let next;
+  for (let i = 0; i < 10; i++){
+    if (type === "n2p"){
+      const p = PROTOS[Math.floor(Math.random()*PROTOS.length)];
+      next = {
+        key:"n"+p.name, type, prompt:p.name, hint:"Type the port number",
+        answer:p.ports.join("/"),
+        check: v => {
+          const parts = v.split(/[\/,\s]+/).filter(Boolean);
+          return parts.length > 0 && parts.every(x => p.ports.includes(Number(x)));
+        }
+      };
+    } else {
+      const n = PORT_PROMPTS[Math.floor(Math.random()*PORT_PROMPTS.length)];
+      const protos = PORT_MAP[n];
+      next = {
+        key:"p"+n, type, prompt:String(n), hint:"Name the protocol",
+        answer:protos.map(p => p.name).join(" or "),
+        check: v => protos.some(p => p.alias.includes(norm(v)))
+      };
+    }
+    if (next.key !== lastKey) break;
+  }
+  lastKey = next.key;
+  return next;
+}
+function showQuestion(){
+  q = makeQuestion();
+  $("prompt").textContent = q.prompt;
+  $("hint").textContent = q.hint;
+}
+
+/* ---------- switch panel ---------- */
+function buildPorts(){
+  $("ports").innerHTML = Array.from({length:24}, () => '<div class="port"></div>').join("");
+}
+function lightPort(ok){
+  const ports = $("ports").children;
+  const i = (attempts - 1) % 24;
+  if (i === 0) [...ports].forEach(p => p.className = "port");
+  ports[i].className = "port " + (ok ? "ok" : "bad");
+  $("linkCount").textContent = `${correct} up / ${attempts - correct} down`;
+}
+
+/* ---------- game flow ---------- */
+function reset(){
+  clearInterval(tick);
+  state = "idle";
+  correct = attempts = streak = bestStreak = 0;
+  missed = new Map();
+  $("timer").textContent = duration;
+  $("live").textContent = "Start typing to begin";
+  $("feedback").textContent = "";
+  $("feedback").className = "feedback";
+  $("answer").value = "";
+  $("answer").disabled = false;
+  $("linkCount").textContent = "0 up / 0 down";
+  buildPorts();
+  $("game").hidden = false;
+  $("results").hidden = true;
+  showQuestion();
+  $("answer").focus();
+}
+function start(){
+  state = "running";
+  startAt = Date.now();
+  tick = setInterval(() => {
+    const left = Math.max(0, duration - (Date.now() - startAt)/1000);
+    $("timer").textContent = Math.ceil(left);
+    if (left <= 0) finish();
+  }, 100);
+}
+function submit(){
+  const v = $("answer").value.trim();
+  if (!v || state === "done") return;
+  if (state === "idle") start();
+  attempts++;
+  const ok = q.check(v);
+  const label = $("prompt");
+  label.classList.remove("flash-ok","flash-bad");
+  void label.offsetWidth;
+  if (ok){
+    correct++; streak++; bestStreak = Math.max(bestStreak, streak);
+    label.classList.add("flash-ok");
+    $("feedback").className = "feedback ok";
+    $("feedback").textContent = streak >= 5 ? `${streak} in a row` : "";
+  } else {
+    streak = 0;
+    label.classList.add("flash-bad");
+    $("feedback").className = "feedback bad";
+    $("feedback").textContent = `${q.prompt} is ${q.answer}`;
+    missed.set(q.key, `<strong>${esc(q.prompt)}</strong> is ${esc(q.answer)}`);
+  }
+  lightPort(ok);
+  $("live").textContent = `${correct} correct`;
+  $("answer").value = "";
+  showQuestion();
+}
+function finish(){
+  clearInterval(tick);
+  state = "done";
+  $("answer").disabled = true;
+  const acc = attempts ? Math.round(correct/attempts*100) : 0;
+  $("rCorrect").textContent = correct;
+  $("rAcc").textContent = acc + "%";
+  $("rRate").textContent = Math.round(correct / (duration/60));
+  $("rStreak").textContent = bestStreak;
+  $("missedList").innerHTML = [...missed.values()].map(m => `<li>${m}</li>`).join("");
+  $("missedBox").hidden = missed.size === 0;
+  $("pName").value = store.get("pt_name", "");
+  $("pCode").value = store.get("pt_code", "");
+  $("codeWrap").hidden = !LEADERBOARD_URL;
+  $("postMsg").textContent = "";
+  $("postBtn").disabled = correct === 0;
+  $("game").hidden = true;
+  $("results").hidden = false;
+  $("pName").focus();
+}
+
+/* ---------- leaderboard ---------- */
+const MODE_NAMES = {n2p:"Protocol to port", p2n:"Port to protocol", mix:"Mixed"};
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function bestPerName(rows){
+  const best = {};
+  rows.forEach(r => {
+    const k = r.name.toLowerCase();
+    if (!best[k] || r.score > best[k].score || (r.score === best[k].score && r.accuracy > best[k].accuracy)) best[k] = r;
+  });
+  return Object.values(best).sort((a,b) => b.score - a.score || b.accuracy - a.accuracy).slice(0,10);
+}
+function renderBoard(rows){
+  const list = $("boardList");
+  if (!rows.length){ list.innerHTML = '<li class="empty">No scores yet. Set the first one.</li>'; return; }
+  list.innerHTML = rows.map((r,i) =>
+    `<li><span class="rank">${i+1}</span><span class="name">${esc(r.name)}</span><span class="pts">${r.score}</span><span class="acc">${r.accuracy}% accuracy</span></li>`
+  ).join("");
+}
+async function loadBoard(){
+  $("boardSub").textContent = `${MODE_NAMES[mode]}, ${duration}s`;
+  $("boardNote").textContent = LEADERBOARD_URL ? "Best score per person." : "Scores are saved in this browser only.";
+  if (!LEADERBOARD_URL){
+    renderBoard(bestPerName(store.get(`pt_local_${mode}_${duration}`, [])));
+    return;
+  }
+  $("boardList").innerHTML = '<li class="empty">Loading scores…</li>';
+  try{
+    const res = await fetch(`${LEADERBOARD_URL}?mode=${mode}&duration=${duration}`);
+    const data = await res.json();
+    renderBoard(data.scores || []);
+  }catch{
+    $("boardList").innerHTML = '<li class="empty">Couldn’t reach the leaderboard. Check your connection and switch modes to retry.</li>';
+  }
+}
+async function postScore(e){
+  e.preventDefault();
+  const name = $("pName").value.trim().slice(0,20);
+  if (!name) return;
+  const accuracy = attempts ? Math.round(correct/attempts*100) : 0;
+  store.set("pt_name", name);
+  $("postBtn").disabled = true;
+
+  if (!LEADERBOARD_URL){
+    const key = `pt_local_${mode}_${duration}`;
+    const rows = store.get(key, []);
+    rows.push({name, score:correct, accuracy});
+    store.set(key, rows);
+    $("postMsg").textContent = "Saved.";
+    loadBoard();
+    return;
+  }
+  const code = $("pCode").value.trim();
+  $("postMsg").textContent = "Posting…";
+  try{
+    const res = await fetch(LEADERBOARD_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({code, name, mode, duration, score:correct, accuracy})
+    });
+    const data = await res.json();
+    if (data.ok){
+      store.set("pt_code", code);
+      $("postMsg").textContent = "Posted.";
+      loadBoard();
+    } else {
+      $("postMsg").textContent = data.error || "The leaderboard rejected that score.";
+      $("postBtn").disabled = false;
+    }
+  }catch{
+    $("postMsg").textContent = "Couldn’t reach the leaderboard. Try again in a moment.";
+    $("postBtn").disabled = false;
+  }
+}
+
+/* ---------- controls ---------- */
+function syncSeg(){
+  document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === mode));
+  document.querySelectorAll("#durSeg button").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.dur) === duration));
+}
+$("modeSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  mode = b.dataset.mode; store.set("pt_mode", mode); syncSeg(); reset(); loadBoard();
+});
+$("durSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  duration = Number(b.dataset.dur); store.set("pt_dur", duration); syncSeg(); reset(); loadBoard();
+});
+$("answer").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " "){ e.preventDefault(); submit(); }
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === "Tab" && e.target.id === "answer") || e.key === "Escape"){ e.preventDefault(); reset(); }
+});
+$("postForm").addEventListener("submit", postScore);
+$("againBtn").addEventListener("click", reset);
+
+syncSeg();
+reset();
+loadBoard();
+</script>
+</body>
+</html>
